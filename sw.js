@@ -1,17 +1,17 @@
 // Sketch3D Service Worker — cache-first strategy
-const CACHE = 'sketch3d-v41';
+const CACHE = 'sketch3d-v39';
 const ASSETS = [
-  '/sketchbook-v3/',
-  '/sketchbook-v3/index.html',
-  '/sketchbook-v3/manifest.json',
-  '/sketchbook-v3/icon72.png',
-  '/sketchbook-v3/icon96.png',
-  '/sketchbook-v3/icon128.png',
-  '/sketchbook-v3/icon144.png',
-  '/sketchbook-v3/icon152.png',
-  '/sketchbook-v3/icon192.png',
-  '/sketchbook-v3/icon384.png',
-  '/sketchbook-v3/icon512.png'
+  './',
+  './index.html',
+  './manifest.json',
+  './icons/icon-72.png',
+  './icons/icon-96.png',
+  './icons/icon-128.png',
+  './icons/icon-144.png',
+  './icons/icon-152.png',
+  './icons/icon-192.png',
+  './icons/icon-384.png',
+  './icons/icon-512.png'
 ];
 
 self.addEventListener('install', e => {
@@ -29,6 +29,7 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  // Only intercept same-origin requests
   if (!e.request.url.startsWith(self.location.origin)) return;
   e.respondWith(
     caches.match(e.request).then(cached => {

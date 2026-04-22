@@ -9,28 +9,15 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Sketch3D">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" sizes="192x192" href="icon192.png">
-<link rel="apple-touch-icon" sizes="512x512" href="icon512.png">
+<link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="512x512" href="icons/icon-512.png">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <script>
   if('serviceWorker' in navigator){
     window.addEventListener('load',function(){
-      navigator.serviceWorker.register('/sketchbook-v3/sw.js').catch(function(e){console.warn('SW:',e);});
+      navigator.serviceWorker.register('./sw.js').catch(function(e){console.warn('SW:',e);});
     });
   }
-  // PWA install prompt — capture before Chrome auto-dismisses it
-  var _pwaPrompt = null;
-  window.addEventListener('beforeinstallprompt', function(e){
-    e.preventDefault();
-    _pwaPrompt = e;
-    var btn = document.getElementById('binstall');
-    if(btn) btn.style.display = 'flex';
-  });
-  window.addEventListener('appinstalled', function(){
-    var btn = document.getElementById('binstall');
-    if(btn) btn.style.display = 'none';
-    _pwaPrompt = null;
-  });
 </script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -671,12 +658,9 @@ body.rside #sc-fab{right:auto;left:8px}
   <button class="btn btn-sm" id="bpng" data-k="P" title="Save PNG (P)">
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="12" height="9" rx="1.5"/><circle cx="7" cy="7.5" r="2"/><path d="M4 3L5 1L9 1L10 3"/></svg>
   </button>
-  <!-- PWA install — hidden until beforeinstallprompt fires; also hidden in standalone mode -->
-  <button class="btn btn-pill" id="binstall" title="Install app" style="display:none;font-size:6.5px;width:auto;padding:0 6px;letter-spacing:.04em;gap:3px">
-    <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="2" x2="7" y2="10"/><polyline points="4,7 7,10 10,7"/><line x1="2" y1="12" x2="12" y2="12"/></svg>
-    INSTALL
-  </button>
-</div> — always top-right, always visible -->
+</div>
+
+<!-- Hide UI button — always top-right, always visible -->
 <button class="btn btn-sm card" id="bhide" title="Hide/show UI (H)">
   <svg id="bhide-eye" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 7Q3 4 7 4Q11 4 13 7Q11 10 7 10Q3 10 1 7Z"/><circle cx="7" cy="7" r="2"/></svg>
 </button>
@@ -5890,21 +5874,6 @@ function newScene(){
 // File
 document.getElementById('bsave').addEventListener('click',saveFile);
 document.getElementById('bload').addEventListener('click',loadFile);
-// PWA install button
-(function(){
-  var btn = document.getElementById('binstall');
-  if(btn){
-    // Hide immediately if already running as installed PWA
-    if(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone){
-      btn.style.display = 'none';
-    }
-    btn.addEventListener('click', function(){
-      if(!_pwaPrompt) return;
-      _pwaPrompt.prompt();
-      _pwaPrompt.userChoice.then(function(){ _pwaPrompt = null; btn.style.display = 'none'; });
-    });
-  }
-})();
 document.getElementById('bexp').addEventListener('click',function(e){
   e.stopPropagation();
   var menu=document.getElementById('expmenu');
