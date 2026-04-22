@@ -1,17 +1,17 @@
 // Sketch3D Service Worker — cache-first strategy
-const CACHE = 'sketch3d-v40';
+const CACHE = 'sketch3d-v41';
 const ASSETS = [
-  '/sketchbook-v5-/',
-  '/sketchbook-v5-/index.html',
-  '/sketchbook-v5-/manifest.json',
-  '/sketchbook-v5-/icon72.png',
-  '/sketchbook-v5-/icon96.png',
-  '/sketchbook-v5-/icon128.png',
-  '/sketchbook-v5-/icon144.png',
-  '/sketchbook-v5-/icon152.png',
-  '/sketchbook-v5-/icon192.png',
-  '/sketchbook-v5-/icon384.png',
-  '/sketchbook-v5-/icon512.png'
+  '/sketchbook-v3/',
+  '/sketchbook-v3/index.html',
+  '/sketchbook-v3/manifest.json',
+  '/sketchbook-v3/icon72.png',
+  '/sketchbook-v3/icon96.png',
+  '/sketchbook-v3/icon128.png',
+  '/sketchbook-v3/icon144.png',
+  '/sketchbook-v3/icon152.png',
+  '/sketchbook-v3/icon192.png',
+  '/sketchbook-v3/icon384.png',
+  '/sketchbook-v3/icon512.png'
 ];
 
 self.addEventListener('install', e => {
