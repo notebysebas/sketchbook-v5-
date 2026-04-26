@@ -156,6 +156,8 @@ body.ui-hidden #sbar,body.ui-hidden #pages,body.ui-hidden #views,
 body.ui-hidden #narrow-bar,body.ui-hidden #selbadge,body.ui-hidden #sgizmo{display:none!important}
 body.ui-hidden #bhide{opacity:.25}
 body.ui-hidden #bhide:hover{opacity:1}
+/* Detached tools card (sg-top) is redundant with ≡ bar when UI is hidden — hide it */
+body.ui-hidden.sc-detached #sg-top{display:none!important}
 /* Float card visible when UI hidden (narrow + tablet), never docked */
 body.ui-hidden #pb-float-card.fc-visible{display:flex}
 body.ui-hidden #pb-float-card.fc-docked-bottom{
@@ -389,7 +391,8 @@ body.ui-hidden #views.recording-open{display:flex!important;bottom:0}
 #new-scene-modal .nsm-btn:hover{background:rgba(26,26,46,.08)}
 #new-scene-modal .nsm-btn.primary{background:rgba(26,26,46,.1);font-weight:500}
 #new-scene-modal .nsm-btn.cancel{color:var(--mut)}
-
+#save-name-modal{position:fixed;inset:0;z-index:601;display:none;align-items:center;justify-content:center;background:rgba(26,26,46,.35);backdrop-filter:blur(3px)}
+#save-name-modal.vis{display:flex}
 
 body.selecting{cursor:crosshair!important}body.selecting *{cursor:crosshair!important}
 
@@ -466,6 +469,9 @@ body.selecting{cursor:crosshair!important}body.selecting *{cursor:crosshair!impo
   align-items:center;justify-content:center;
   -webkit-tap-highlight-color:transparent;touch-action:none}
 body.rside #sc-fab{right:auto;left:8px}
+/* When UI is hidden, move sc-fab into the left column above LCL:
+   stack reads bottom-up: ≡ (10) → LCL (52) → sc-fab (94) */
+body.ui-hidden #sc-fab{top:auto;right:auto;left:10px;bottom:94px}
 
 /* Panels row — always visible, fills full width, never scrolls */
 #pb-panels{display:flex;gap:4px;align-items:stretch;padding:5px 6px 4px;flex-shrink:0}
@@ -579,6 +585,16 @@ body.rside #sc-fab{right:auto;left:8px}
       <button class="nsm-btn primary" id="nsm-save">Save &amp; New</button>
       <button class="nsm-btn" id="nsm-discard">Discard &amp; New</button>
       <button class="nsm-btn cancel" id="nsm-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+<div id="save-name-modal">
+  <div class="nsm-box">
+    <div class="nsm-title">SAVE AS</div>
+    <input id="save-name-input" type="text" value="sketch3d" autocomplete="off" spellcheck="false" style="height:28px;border-radius:7px;border:1px solid var(--bdr);background:transparent;color:var(--ink);font-family:'DM Mono',monospace;font-size:9px;padding:0 8px;outline:none;letter-spacing:.04em">
+    <div class="nsm-btns">
+      <button class="nsm-btn primary" id="snm-save">Save</button>
+      <button class="nsm-btn cancel" id="snm-cancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -2836,9 +2852,30 @@ function startOrbit(e){const p=ppos(e);cam.active=true;cam.sx=p.x;cam.sy=p.y;cam
   // Ortho auto-return: any manual orbit snaps back to perspective
   if(useOrtho)setOrtho(false);
 }
-function startPan(e){const p=ppos(e);cam.panActive=true;cam.panAnchor=panUnproject(p.x,p.y);cam.panTargetAtStart.copy(cam.target);}
+function startPan(e){const p=ppos(e);cam.panActive=true;cam.panAnchor=panUnproject(p.x,p.y);cam.panTargetAtStart.copy(cam.target);cam._panPrevX=p.x;cam._panPrevY=p.y;}
 function doOrbit(e){const p=ppos(e);cam.theta=cam.st+(p.x-cam.sx)*.013;cam.phi=Math.max(.05,Math.min(Math.PI-.05,cam.sp-(p.y-cam.sy)*.013));updCam();}
-function doPan(e){const p=ppos(e);if(!cam.panAnchor)return;const cur=panUnproject(p.x,p.y);cam.target.copy(cam.panTargetAtStart).addScaledVector(new THREE.Vector3().subVectors(cam.panAnchor,cur),1);updCam();renderer.render(scene,activeCam());}
+function doPan(e,overrideCX,overrideCY){
+  var cx,cy;
+  if(overrideCX!=null){cx=overrideCX;cy=overrideCY;}
+  else{const p=ppos(e);cx=p.x;cy=p.y;}
+  var prevX=cam._panPrevX!=null?cam._panPrevX:cx;
+  var prevY=cam._panPrevY!=null?cam._panPrevY:cy;
+  var dx=cx-prevX,dy=cy-prevY;
+  cam._panPrevX=cx;cam._panPrevY=cy;
+  if(Math.abs(dx)<0.5&&Math.abs(dy)<0.5)return;
+  var r=_cachedRect;
+  if(useOrtho){
+    var ac=ortho;
+    var worldW=(ac.right-ac.left);var worldH=(ac.top-ac.bottom);
+    cam.target.x-=(dx/r.width)*worldW;
+    cam.target.y-=(dy/r.height)*worldH;
+  } else {
+    var wBefore=panUnproject((cx-dx)-r.left,(cy-dy)-r.top);
+    var wAfter=panUnproject(cx-r.left,cy-r.top);
+    cam.target.add(new THREE.Vector3().subVectors(wBefore,wAfter));
+  }
+  updCam();
+}
 
 function onDown(e){
   // ── Stylus-only mode: finger touches always navigate, only pen draws ──
@@ -2858,7 +2895,7 @@ function onDown(e){
       const cx=(e.touches[0].clientX+e.touches[1].clientX)/2,cy=(e.touches[0].clientY+e.touches[1].clientY)/2;
       _twoFingerStartCX=cx;_twoFingerStartCY=cy;
       // Arm pan immediately
-      cam.panActive=true;cam.panAnchor=panUnproject(cx,cy);cam.panTargetAtStart.copy(cam.target);
+      cam.panActive=true;cam._panPrevX=cx;cam._panPrevY=cy;
       return;
     }
   }
@@ -2886,7 +2923,7 @@ function onDown(e){
     lastPD=null;_twoFingerLock='none';
     const mx=(e.touches[0].clientX+e.touches[1].clientX+e.touches[2].clientX)/3;
     const my=(e.touches[0].clientY+e.touches[1].clientY+e.touches[2].clientY)/3;
-    if(twoFingerMode==='orbit'){threeFingerPan=true;tf3Anchor=panUnproject(mx,my);tf3TargetAtStart=cam.target.clone();}
+    if(twoFingerMode==='orbit'){threeFingerPan=true;cam._panPrevX=mx;cam._panPrevY=my;}
     else{cam.active=true;cam.sx=mx;cam.sy=my;cam.st=cam.theta;cam.sp=cam.phi;}
     return;
   }
@@ -2927,7 +2964,7 @@ function onMove(e){
           if(pinchDelta>8)_twoFingerLock='zoom';
           else if(moveDelta>8){
             _twoFingerLock='navigate';
-            if(!cam.panActive){cam.panActive=true;cam.panAnchor=panUnproject(cx,cy);cam.panTargetAtStart.copy(cam.target);}
+            if(!cam.panActive){cam.panActive=true;cam._panPrevX=cx;cam._panPrevY=cy;}
           }
         }
         if(_twoFingerLock==='zoom'||_twoFingerLock==='none'){
@@ -2940,7 +2977,7 @@ function onMove(e){
             updCam();
           }
         }
-        if(_twoFingerLock==='navigate'&&cam.panActive)doPan({clientX:cx,clientY:cy,touches:e.touches});
+        if(_twoFingerLock==='navigate'&&cam.panActive)doPan(null,cx,cy);
         lastPD=d;
       } else {
       // Determine gesture lock if not yet set (threshold: 8px)
@@ -2952,7 +2989,7 @@ function onMove(e){
           _twoFingerLock='navigate';
           // Arm orbit/pan origin now — lazily, only once the lock is decided
           if(twoFingerMode==='orbit'){cam.active=true;cam.sx=cx;cam.sy=cy;cam.st=cam.theta;cam.sp=cam.phi;if(useOrtho)setOrtho(false);}
-          else{cam.panActive=true;cam.panAnchor=panUnproject(cx,cy);cam.panTargetAtStart.copy(cam.target);}
+          else{cam.panActive=true;cam._panPrevX=cx;cam._panPrevY=cy;}
         }
       }
       if(_twoFingerLock==='zoom'||_twoFingerLock==='none'){
@@ -2978,12 +3015,12 @@ function onMove(e){
       if(_twoFingerLock==='navigate'){
         // Only apply orbit or pan
         if(twoFingerMode==='orbit'&&cam.active){cam.theta=cam.st+(cx-cam.sx)*.013;cam.phi=Math.max(.05,Math.min(Math.PI-.05,cam.sp-(cy-cam.sy)*.013));updCam();}
-        else if(twoFingerMode==='pan'&&cam.panActive)doPan({clientX:cx,clientY:cy,touches:e.touches});
+        else if(twoFingerMode==='pan'&&cam.panActive)doPan(null,cx,cy);
       }
       lastPD=d;
       }
     }else if(e.touches.length===3){
-      if(threeFingerPan&&tf3Anchor){const mx=(e.touches[0].clientX+e.touches[1].clientX+e.touches[2].clientX)/3,my=(e.touches[0].clientY+e.touches[1].clientY+e.touches[2].clientY)/3;const cur=panUnproject(mx,my);cam.target.copy(tf3TargetAtStart).addScaledVector(new THREE.Vector3().subVectors(tf3Anchor,cur),1);updCam();}
+      if(threeFingerPan){const mx=(e.touches[0].clientX+e.touches[1].clientX+e.touches[2].clientX)/3,my=(e.touches[0].clientY+e.touches[1].clientY+e.touches[2].clientY)/3;doPan(null,mx,my);}
       else if(cam.active){const mx=(e.touches[0].clientX+e.touches[1].clientX+e.touches[2].clientX)/3,my=(e.touches[0].clientY+e.touches[1].clientY+e.touches[2].clientY)/3;cam.theta=cam.st+(mx-cam.sx)*.013;cam.phi=Math.max(.05,Math.min(Math.PI-.05,cam.sp-(my-cam.sy)*.013));updCam();}
     }
     return;
@@ -3059,6 +3096,8 @@ function onUp(e){
       const cx=(e.touches[0].clientX+e.touches[1].clientX)/2,cy=(e.touches[0].clientY+e.touches[1].clientY)/2;
       _twoFingerStartCX=cx;_twoFingerStartCY=cy;
       threeFingerPan=false;tf3Anchor=null;
+      // Seed incremental pan prev position for the continuing gesture
+      cam._panPrevX=cx;cam._panPrevY=cy;
       // Carry camera pose forward so navigate branch has a valid origin
       cam.active=false;cam.panActive=false;
       return;
@@ -3562,7 +3601,9 @@ function loadAllPages(data){
     refreshViewStrip();
   }
 }
-function saveFile(){const b=new Blob([JSON.stringify(sceneData(),null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='sketch3d.json';a.click();URL.revokeObjectURL(u);toast('Saved');}
+function _doSaveFile(name){renderer.render(scene,activeCam());var src=renderer.domElement;var tmp=document.createElement('canvas');tmp.width=120;tmp.height=84;var tc=tmp.getContext('2d');tc.drawImage(src,0,0,120,84);var thumb=tmp.toDataURL('image/jpeg',0.5);var data=sceneData();data.thumb=thumb;var b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});var u=URL.createObjectURL(b);var a=document.createElement('a');a.href=u;a.download=(name||'sketch3d')+'.json';a.click();URL.revokeObjectURL(u);toast('Saved');}
+function saveFileWithName(defaultName,onComplete){var snmod=document.getElementById('save-name-modal');var inp=document.getElementById('save-name-input');inp.value=defaultName||'sketch3d';snmod._onComplete=onComplete||null;snmod.classList.add('vis');inp.focus();inp.select();}
+function saveFile(){saveFileWithName('sketch3d',null);}
 function loadFile(){document.getElementById('filein').click();}
 document.getElementById('filein').addEventListener('change',function(){const f=this.files[0];if(!f)return;const r=new FileReader();r.onload=function(ev){try{loadAllPages(JSON.parse(ev.target.result));toast('Loaded');}catch(e){alert('Invalid file.');}};r.readAsText(f);this.value='';});
 // ── IndexedDB auto-save (replaces localStorage) ────────────────────
@@ -5943,6 +5984,11 @@ document.getElementById('bhide').addEventListener('click',function(){
     }
     // In narrow mode, card visibility is already managed by updateLayoutMode/narrow state
   }
+  // Sync LCL float position to new ui-hidden state.
+  // Docked path never called applySidecol(), so LCL would stay at its old
+  // sg-bottom position and overlap the ≡ toggle. Call immediately on hide;
+  // defer on show so sidecol layout is restored before measuring sg-bottom.
+  if(hidden){positionLclFloat();}else{setTimeout(positionLclFloat,0);}
 });
 
 // ── Background color ──────────────────────────────────────────────
@@ -6023,7 +6069,8 @@ function newScene(){
   updCam();
   // Reset bg color to beige
   setBgColor('#cdb899','beige');
-  // Reset brush to defaults: size 1, opacity 95
+  // Reset brush to defaults: draw mode, size 1, opacity 95
+  setMode('draw');
   if(window._applySize) window._applySize(1);
   if(window._applyOpacity) window._applyOpacity(95);
   // Reset layers
@@ -6044,7 +6091,7 @@ function newScene(){
     showModal();
   });
   document.getElementById('nsm-save').addEventListener('click',function(){
-    hideModal();saveFile();newScene();
+    hideModal();saveFileWithName('sketch3d',newScene);
   });
   document.getElementById('nsm-discard').addEventListener('click',function(){
     hideModal();newScene();
@@ -6052,8 +6099,30 @@ function newScene(){
   document.getElementById('nsm-cancel').addEventListener('click',hideModal);
   modal.addEventListener('click',function(e){if(e.target===modal)hideModal();});
 })();
-
-// File
+(function(){
+  var snmod=document.getElementById('save-name-modal');
+  var inp=document.getElementById('save-name-input');
+  function hideSnm(){snmod.classList.remove('vis');}
+  function confirm(){
+    var name=inp.value.trim()||'sketch3d';
+    var cb=snmod._onComplete;
+    snmod._onComplete=null;
+    hideSnm();
+    _doSaveFile(name);
+    if(cb)cb();
+  }
+  function cancel(){
+    snmod._onComplete=null;
+    hideSnm();
+  }
+  document.getElementById('snm-save').addEventListener('click',confirm);
+  document.getElementById('snm-cancel').addEventListener('click',cancel);
+  snmod.addEventListener('click',function(e){if(e.target===snmod)cancel();});
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){confirm();}
+    if(e.key==='Escape'){cancel();}
+  });
+})();
 document.getElementById('bsave').addEventListener('click',saveFile);
 document.getElementById('bload').addEventListener('click',loadFile);
 document.getElementById('bexp').addEventListener('click',function(e){
@@ -6129,6 +6198,12 @@ document.getElementById('cpick').addEventListener('input',function(){curColor=th
     drawOpCanvas(document.getElementById('op-p30-pb'),30,col);
     drawOpCanvas(document.getElementById('op-p60-pb'),60,col);
     drawOpCanvas(document.getElementById('op-p95-pb'),95,col);
+    drawSzCanvas(document.getElementById('sz-p1-scx'),1,col);
+    drawSzCanvas(document.getElementById('sz-p3-scx'),3,col);
+    drawSzCanvas(document.getElementById('sz-p6-scx'),6,col);
+    drawOpCanvas(document.getElementById('op-p30-scx'),30,col);
+    drawOpCanvas(document.getElementById('op-p60-scx'),60,col);
+    drawOpCanvas(document.getElementById('op-p95-scx'),95,col);
     drawSzCanvas(document.getElementById('sz-prev-pop'),brushSz,col);
     drawOpCanvas(document.getElementById('op-prev-pop'),op,col);
     document.querySelectorAll('[data-sz]').forEach(function(b){b.classList.toggle('cur',+b.dataset.sz===brushSz);});
